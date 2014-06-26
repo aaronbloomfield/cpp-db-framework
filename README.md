@@ -1,26 +1,16 @@
 C++ Database Framework
 ======================
 
-This is a C++ program that creates a series of C++ classes that can be used to access a MySQL database.  In particular, for each table in the DB, a separate C++ class is created, which represents a record from that table.  Functions for loading and saving the data are also included.  It is meant to be a simple utility that creates a series of C++ classes that can easily be used to access a DB; the design goal was quickly writing this code, not having complete functionality.
+This is a utility that creates a series of C++ classes that can be used to access a MySQL database.  In particular, for each table in the DB, a separate C++ class is created, which represents a record from that table.  Functions for loading and saving the data are also included.  It is meant to be a simple utility that creates a series of C++ classes that can easily be used to access a DB; the design goal was quickly writing this code, not having complete functionality.
 
-It is released under the the GPL, v2.  It was created by [Aaron Bloomfield](http://www.cs.virginia.edu/~asb) ([aaron@virginia.edu](<mailto:aaron@virginia.edu>), [@bloomfieldaaron](http://twitter.com/bloomfieldaaron)).
+It is released under the the GPL, v2.  It was created by [Aaron Bloomfield](http://aaronbloomfield.me) ([aaron@virginia.edu](<mailto:aaron@virginia.edu>), [@bloomfieldaaron](http://twitter.com/bloomfieldaaron)).
 
-It is assumed that each table has an integer `id` field (likely `auto_increment`, although that is technically not a requirement) such that each record can be uniquely identified by that `id` field.  This is necessary for any saving of a row.
-
-Todos / Limitations
--------------------
-
-This is a list of features yet to be implemented (i.e., the limitations of this code)
-
-- Some MySQL data types are not yet supported, such as blobs, enums, and decimal.  Note that text, double, floats, and integer types are all supported.
-- The various integer sizes in C++ should be made to match the same size (and singed/unsigned) as the MySQL verions -- right now, all MySQL integer ytpes are a C++ `int`, execpt for a MySQL `bitint`, which is a C++ `long`.
-- A methods to return `last_insert_id()`, which would be called after `enter()`.  Or perhaphs `enter()` could return that value.
-- A way to get the MySQL warnings after an update/entry.  Or have it somehow return the error/warning status.
+It is assumed that each table has an integer `id` field (likely `auto_increment`, although that is technically not a requirement) such that each record can be uniquely identified by said `id` field.  This is necessary for any saving of data to the DB.
 
 Classes
 -------
 
-There is one parent class, `dboject`, and the rest of the classes (one per table) are all sub-classes of `dbobject`.
+There is one parent class created, `dboject`, and the rest of the created classes (one per table) are all sub-classes of `dbobject`.
 
 ### dbobject ###
 
@@ -46,7 +36,7 @@ These methods all have their impelementation in the dbobject.cpp file.  All thes
 
 ##### Protected methods #####
 
-These subroutines are protected in dboject (for `operator<< ()`) or the sublcasses (for all the rest).  Thus, they are not part of the public interface, and are only included here for those who want to delve into how the code works.
+These methods are all `protected` in the sub-classes; there is also one function (`operator<< ()`) in dbobject.h/cpp.  Thus, they are not part of the public interface, and are only included here for those who want to delve into how the code works.
 
 - `ostream& operator<< (ostream& out, dbobject &x)`: allows printing of the object via `cout`.  As it is declared for dbobject, it calls `put()` on the sub-class to allow the sub-class to print itself properly.
 - `virtual dbobject* readInFullRow(MYSQL_ROW row)`: reads in a full row, entering each column into a field in the class.
@@ -112,3 +102,13 @@ dbobject::setMySQLConnection(conn);
 ```
 
 At that point, the various methods in the generated classes should work.
+
+Todos / Limitations
+-------------------
+
+This is a list of features yet to be implemented (i.e., the limitations of this code)
+
+- Some MySQL data types are not yet supported, such as blobs, enums, and decimal.  Note that text, double, floats, and integer types are all supported.
+- The various integer sizes in C++ should be made to match the same size (and singed/unsigned) as the MySQL verions -- right now, all MySQL integer ytpes are a C++ `int`, execpt for a MySQL `bitint`, which is a C++ `long`.
+- A methods to return `last_insert_id()`, which would be called after `enter()`.  Or perhaphs `enter()` could return that value.
+- A way to get the MySQL warnings after an update/entry.  Or have it somehow return the error/warning status.
