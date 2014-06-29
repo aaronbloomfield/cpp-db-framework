@@ -10,7 +10,7 @@ It is assumed that each table has an integer `id` field (likely `auto_increment`
 Classes
 -------
 
-There is one parent class created, `dboject`, and the rest of the created classes (one per table) are all sub-classes of `dbobject`.
+There is one parent class created, `dbobject`, and the rest of the created classes (one per table) are all sub-classes of `dbobject`.
 
 ### dbobject ###
 
@@ -48,13 +48,12 @@ These methods are all `protected` in the sub-classes; there is also one function
 
 Each table in the DB has it's own class, and the class name is the same as the table name.  For each column in the table, the following are included in the class:
 
-- a field with an equivalent C++ type (all `text` fields are represented via a C++ `string`)
-- a setter method that takes in the type of the field, and sets the (private) field in the class to the passed value
-- a setter method that takes in a `char*`, and parses that (based on the field type) into the (private) field in the class
-- a getter method, which gets the value of the field
-- a method to set that field to NULL
-
-For the naming convention for the setters/getters, the first letter of the field is capitalized, with 'set' or 'get' pre-pended to it.  For the set-to-NULL methods, the setter method name is appended with "ToNull".
+- A field with an equivalent C++ type (all `text` fields are represented via a C++ `string`), as well as a field to indicate if that value is set to NULL; note that all fields are `private`
+- A setter method that takes in the type of the field, and sets the (`private`) field in the class to the passed value; this method's name has `set_` pre-pended to the field name
+- A setter method that takes in a `char*`, and parses that (based on the field type) into the (private) field in the class; this method's name also has `set_` pre-pended to the field name (if this parameter is `NULL`, then the field is set to NULL)
+- A getter method, which gets the value of the field; this method's name has `get_` pre-pended to the field name (this returns a pointer to the field in the object, and this pointer is `NULL` if the field is NULL; note that this allows direct access to the field)
+- A method to set that field to NULL; this method's name has `setToNull_` pre-pended to the field name
+- A method to get if that field is NULL; this method's name has `getIsNull_` pre-pended to the field name
 
 In addition, there are few other methods included in each sub-class:
 
@@ -71,7 +70,7 @@ Files Created
 
 All files are created into a dbcpp/ sub-directory.  Any files of the same name in that directory will be overwritten.
 
-The `dboject` class is in its own files (dboject.h and dboject.cpp).  Each class has it's own .h and .cpp files, with the class name (and thus the file base name) being the same as the table name.
+The `dbobject` class is in its own files (dbobject.h and dbobject.cpp).  Each class has it's own .h and .cpp files, with the class name (and thus the file base name) being the same as the table name.
 
 A "all\_db\_h\_files.h" file is created, which just \#include's all the other .h files.
 
@@ -112,3 +111,4 @@ This is a list of features yet to be implemented (i.e., the limitations of this 
 - The various integer sizes in C++ should be made to match the same size (and singed/unsigned) as the MySQL verions -- right now, all MySQL integer ytpes are a C++ `int`, execpt for a MySQL `bitint`, which is a C++ `long`.
 - A methods to return `last_insert_id()`, which would be called after `enter()`.  Or perhaphs `enter()` could return that value.
 - A way to get the MySQL warnings after an update/entry.  Or have it somehow return the error/warning status.
+- Enums are just stored as a `string`, and can be set (through the C++ object) to any value, and is not restricted to the enum value
