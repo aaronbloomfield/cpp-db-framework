@@ -158,17 +158,25 @@ string getNullValueForType (string type) {
 
 int main(int argc, char** argv) {
     char *dbname = NULL, *dbuser = NULL, *dbpass = NULL, *dbhost = NULL;
+    string buffer;
     vector<string> hfiles;
     hfiles.push_back("dbobject.h");
     
-    if ( argc != 5 ) {
-        cerr << "Usage: " << argv[0] << " <hostname> <database> <username> <password>" << endl;
+    if ( (argc != 5) && (argc != 4) ) {
+        cerr << "Usage: " << argv[0] << " <hostname> <database> <username> [<password>]" << endl;
         exit(0);
     } else {
         dbhost = argv[1];
         dbname = argv[2];
         dbuser = argv[3];
-        dbpass = argv[4];
+    }
+
+    if ( argc == 5 )
+      dbpass = argv[4];
+    else {
+      cout << "Enter password for user '" << dbuser << "' for database '" << dbname << "' on host '" << dbhost << "': ";
+      cin >> buffer;
+      dbpass = (char*) buffer.c_str();
     }
     
     // connect to DB
@@ -434,6 +442,8 @@ int main(int argc, char** argv) {
             << "\n#include <iostream>\n#include <vector>\n#include <string>\n#include <mysql/mysql.h>\n\nusing namespace std;\n\n"
             << "class dbobject {\npublic:\n  dbobject();\n"
             << "  dbobject(const dbobject& orig);\n  virtual ~dbobject();\n\n"
+            << "  static bool connect(string host, string db, string user, string passwd);\n"
+            << "  static bool connect(char* host, char* db, char* user, char* passwd);\n\n"
             << "  vector<dbobject*> loadAll(MYSQL *conn = NULL);\n"
             << "  vector<dbobject*> load(string constraint, int count = 0, MYSQL *conn = NULL);\n"
             << "  dbobject* loadFirst(string constraint, MYSQL *conn = NULL);\n\n"
@@ -469,6 +479,16 @@ int main(int argc, char** argv) {
             << "dbobject::dbobject() {\n}\n\n"
             << "dbobject::dbobject(const dbobject& orig) {\n}\n\n"
             << "dbobject::~dbobject() {\n}\n\n"
+            << "bool dbobject::connect(char* host, char* db, char* user, char* passwd) {\n"
+            << "  MYSQL *conn = mysql_init(NULL);\n"
+            << "  if (!mysql_real_connect(conn, host, user, passwd, db, 0, NULL, 0))\n"
+            << "    return false;\n"
+            << "  setMySQLConnection(conn);\n"
+            << "  return true;\n"
+	    << "}\n\n"
+	    << "bool dbobject::connect(string host, string db, string user, string passwd) {\n"
+	    << "  return connect(host.c_str(),db.c_str(),user.c_str(),passwd.c_str());\n"
+	    << "}\n\n"
             << "void dbobject::setVerbose(bool which) {\n  _verbose = which;\n}\n\n"
             << "void dbobject::setMySQLConnection(MYSQL *conn) {\n"
             << "  theconn = conn;\n"

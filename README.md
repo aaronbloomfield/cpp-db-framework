@@ -7,6 +7,11 @@ It is released under the the GPL, v2.  It was created by [Aaron Bloomfield](http
 
 It is assumed that each table has an integer `id` field (likely `auto_increment`, although that is technically not a requirement) such that each record can be uniquely identified by said `id` field.  This is necessary for any saving of data to the DB.
 
+To call this utility, you pass either three or four parameters on the command line: hostname, database name, user name, and an optional password, in that order.  If the password is not specified, then the program will prompt for one.  The utility will create a dbcpp/ directory, in which all of the files it create will be written.
+
+The `connect()` methods in dbobject will connect to the database; dbobject.h has a `#include <mysql/mysql.h>` line.  To compile, it must be linked with the mysqlclient library (pass `-lmysqlclient` to the compiler).
+
+
 Classes
 -------
 
@@ -23,6 +28,7 @@ These methods all have their impelementation in the dbobject.cpp file.  All thes
 - `dbobject()`: constructor; does nothing.
 - `dbobject(const dbobject& orig)`: copy constructor; does nothing.
 - `virtual ~dbobject()`: destructor; does nothing.
+- `connect (string host, string db, string user, string passwd)`: this connects to the DB; there is also a version of this method that takes in `char*` parameters.
 - `void setVerbose(bool which)`: when `true`, this will cause the sub-classes to print queries on some actions.
 - `void setMySQLConnection(MYSQL *conn = NULL)`: this sets the MySQL connection that is used by all the code produced by this utility; see below for how to create a `MYSQL*` connection.
 - `vector<dbobject*> loadAll(MYSQL *conn = NULL)`: loads all the entries from the table into a vector.  The individual classes are the specific sub-classes, represented in the vector as `dbobject*` pointers.
@@ -76,31 +82,6 @@ A "all\_db\_h\_files.h" file is created, which just \#include's all the other .h
 
 A sample Makefile is created, which compiles all of the .cpp files created by this utility.  The 'main' target will create an executable, but a main.cpp file needs to be provided for that.
 
-Connecting to MySQL
--------------------
-
-The following code will connect to MySQL; this needs `#include <mysql/mysql.h>` line, as well as linking to the mysqlclient library (`-lmysqlclient` to the compiler).  These files can be installed on an Ubuntu system via the libmysqlclient-dev package.  Change the first four lines to match your credentials.
-
-
-```
-char *dbhost = (char*) "localhost";
-char *dbname = (char*) "database";
-char *dbuser = (char*) "username";
-char *dbpass = (char*) "password";
-MYSQL *conn = mysql_init(NULL);
-if (!mysql_real_connect(conn, dbhost, dbuser, dbpass, dbname, 0, NULL, 0)) {
-    cerr << "Error connecting to the DB: " << mysql_error(conn) << endl;
-    exit(1);
-}
-```
-
-Once connected, the dbobject connection must be set:
-
-```
-dbobject::setMySQLConnection(conn);
-```
-
-At that point, the various methods in the generated classes should work.
 
 Todos / Limitations
 -------------------
