@@ -93,10 +93,14 @@ string convertTypeMain(char* type) {
         return "float";
 
     if ( (strlen(type)>7) && (!strncmp(type,"varchar",7)) ) {
-        int size;
-        sscanf (type,"varchar(%d)", &size);
-        char ret[32];
-        sprintf (ret, "char[%d]", size);
+        //int size;
+        //sscanf (type,"varchar(%d)", &size);
+        //char ret[32];
+        //sprintf (ret, "char[%d]", size);
+        return "string";
+    }
+    
+    if ( (strlen(type)>7) && (!strncmp(type,"decimal",7)) ) {
         return "string";
     }
     
@@ -385,7 +389,7 @@ int main(int argc, char** argv) {
         cfile << "  ret << \"}\";\n  return (out << ret.str());\n}\n\n";
         // isUpdate()
         cfile << "bool " << *it << "::isUpdate() {\n"
-                << "  return (!_id_is_null);\n"
+	        << "  return (!_" << fields[0] << "_is_null);\n"
                 << "}\n\n";
         // save()
         cfile << "void " << *it << "::save(MYSQL *conn) {\n"

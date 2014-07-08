@@ -5,7 +5,7 @@ This is a utility that creates a series of C++ classes that can be used to acces
 
 It is released under the the GPL, v2.  It was created by [Aaron Bloomfield](http://aaronbloomfield.me) ([aaron@virginia.edu](<mailto:aaron@virginia.edu>), [@bloomfieldaaron](http://twitter.com/bloomfieldaaron)).
 
-It is assumed that each table has an integer `id` field (likely `auto_increment`, although that is technically not a requirement) such that each record can be uniquely identified by said `id` field.  This is necessary for any saving of data to the DB.
+It is assumed that each table has an integer id field (likely `auto_increment`, although that is technically not a requirement) as the **first** column in the table.  This is necessary for any saving of data to the DB.  If this is not the case, then there will be errors when saving a records (and it may corrupt the data in the DB!), but the non-saving features will certainly work.  Note that this field can be named anything ("id", "fooid", etc.).  In particular, it must be such that each record can be uniquely identified by said id field.  
 
 To call this utility, you pass either three or four parameters on the command line: hostname, database name, user name, and an optional password, in that order.  If the password is not specified, then the program will prompt for one.  The utility will create a dbcpp/ directory, in which all of the files it create will be written.
 
@@ -93,3 +93,5 @@ This is a list of features yet to be implemented (i.e., the limitations of this 
 - A methods to return `last_insert_id()`, which would be called after `enter()`.  Or perhaphs `enter()` could return that value.
 - A way to get the MySQL warnings after an update/entry.  Or have it somehow return the error/warning status.
 - Enums are just stored as a `string`, and can be set (through the C++ object) to any value, and is not restricted to the enum value
+- Likewise, decimal types are just stored as `string` objects
+- If there is no auto_increment ID field in a table (or at least as the first column in a table), then it should detect this and prevent saving of records
