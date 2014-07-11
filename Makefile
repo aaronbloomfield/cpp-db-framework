@@ -1,2 +1,2 @@
 main:
-	g++ -o cppdbframework main.cpp -lmysqlclient
+	g++ -o cppdbframework -std=c++0x main.cpp -lmysqlclient

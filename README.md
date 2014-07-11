@@ -7,9 +7,14 @@ It is released under the the GPL, v2.  It was created by [Aaron Bloomfield](http
 
 It is assumed that each table has an integer id field (likely `auto_increment`, although that is technically not a requirement) as the **first** column in the table.  This is necessary for any saving of data to the DB.  If this is not the case, then there will be errors when saving a records (and it may corrupt the data in the DB!), but the non-saving features will certainly work.  Note that this field can be named anything ("id", "fooid", etc.).  In particular, it must be such that each record can be uniquely identified by said id field.  
 
+Introduction
+------------
+
 To call this utility, you pass either three or four parameters on the command line: hostname, database name, user name, and an optional password, in that order.  If the password is not specified, then the program will prompt for one.  The utility will create a dbcpp/ directory, in which all of the files it create will be written.
 
 The `connect()` methods in dbobject will connect to the database; dbobject.h has a `#include <mysql/mysql.h>` line.  To compile, it must be linked with the mysqlclient library (pass `-lmysqlclient` to the compiler).
+
+All classes are in a `db` namespace.
 
 
 Classes
