@@ -25,13 +25,8 @@ public:
   static bool connect(string host, string db, string user, string passwd);
   static bool connect(char* host, char* db, char* user, char* passwd);
 
-  vector<dbobject*> loadAll(MYSQL *conn = NULL);
-  vector<dbobject*> load(string constraint, int count = 0, MYSQL *conn = NULL);
-  dbobject* loadFirst(string constraint, MYSQL *conn = NULL);
-
   static void setVerbose (bool which);
   static void setMySQLConnection(MYSQL *conn);
-  static void freeVector(vector<dbobject*> vec);
   static void saveAll(vector<dbobject*> vec, MYSQL *conn = NULL);
   static void executeUpdate(string query, MYSQL *conn = NULL);
 
@@ -40,6 +35,8 @@ public:
 protected:
   static bool _verbose;
   static MYSQL *theconn;
+
+  static MYSQL *getMySQLConnection();
 
   virtual dbobject* readInFullRow(MYSQL_ROW row) = 0;
   virtual string getTableName() = 0;
@@ -114,19 +111,8 @@ void dbobject::setMySQLConnection(MYSQL *conn) {
   theconn = conn;
 }
 
-vector<dbobject*> dbobject::loadAll(MYSQL *conn) {
-  return load("",0,conn);
-}
-
-void dbobject::freeVector(vector<dbobject*> vec) {
-  for ( unsigned int i = 0; i < vec.size(); i++ )
-    delete vec[i];
-  vec.clear();
-}
-
-dbobject* dbobject::loadFirst(string constraint, MYSQL *conn) {
-  vector<dbobject*> foo = load("",1,conn);
-  return foo[0];
+MYSQL* dbobject::getMySQLConnection() {
+  return theconn;
 }
 
 void dbobject::executeUpdate(string query, MYSQL *conn) {
@@ -142,38 +128,11 @@ void dbobject::executeUpdate(string query, MYSQL *conn) {
   }
 }
 
-vector<dbobject*> dbobject::load(string constraint, int count, MYSQL *conn) {
-  if ( conn == NULL )
-    conn = theconn;
-  if ( conn == NULL ) {
-    cerr << "Ack!  conn is null in dbobject::load()" << endl;
-    exit(1);
-  }
-  stringstream querystream;
-  querystream << "select * from " << getTableName();
-  if ( constraint != "" )
-    querystream << " where " << constraint;
-  if ( count != 0 )
-    querystream << " limit " << count;
-  string query = querystream.str();
-  if (mysql_query(conn, query.c_str())) {
-    cerr << mysql_error(conn) << endl;
-    exit(1);
-  }
-  MYSQL_RES *res = mysql_use_result(conn);
-  vector<dbobject*> *ret = new vector<dbobject*>();
-  MYSQL_ROW row;
-  while ((row = mysql_fetch_row(res)) != NULL)
-    ret->push_back(readInFullRow(row));
-  mysql_free_result(res);
-  return *ret;
-}
-
 void dbobject::saveAll(vector<dbobject*> vec, MYSQL *conn) {
   if ( conn == NULL )
     conn = theconn;
   if ( conn == NULL ) {
-    cerr << "Ack!  conn is null in dbobject::load()" << endl;
+    cerr << "Ack!  conn is null in dbobject::saveAll()" << endl;
     exit(1);
   }
   for ( unsigned int i = 0; i < vec.size(); i++ )

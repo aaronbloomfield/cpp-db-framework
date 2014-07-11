@@ -259,6 +259,10 @@ int main(int argc, char** argv) {
         for ( int i = 0; i < fields.size(); i++ )
             hfile << "char *_" << fields[i] << ((i!=fields.size()-1)?", ":"");
         hfile << ");\n";
+	hfile << "    static vector<" << *it << "*> loadAll(MYSQL *conn = NULL);\n";
+	hfile << "    static vector<" << *it << "*> load(string constraint, int count = 0, MYSQL *conn = NULL);\n";
+	hfile << "    static " << *it << "* loadFirst(string constraint, MYSQL *conn = NULL);\n";
+	hfile << "    static void freeVector(vector<" << *it << "*> vec);\n";
         // protected methods
         hfile << "\n  protected:\n    virtual dbobject* readInFullRow(MYSQL_ROW row);\n"
                 << "    virtual string getTableName();\n"
@@ -344,6 +348,46 @@ int main(int argc, char** argv) {
         for ( int i = 0; i < fields.size(); i++ )
             cfile << "_" << fields[i] << ((i!=fields.size()-1)?", ":"");
         cfile << ");\n  x.save();\n}\n\n";
+	// loadAll() and loadFirst()
+        cfile << "vector<" << *it << "*> " << *it << "::loadAll(MYSQL *conn) {\n"
+	      << "  return load(\"\",0,conn);\n"
+	      << "}\n\n";
+	cfile << "" << *it << "* " << *it << "::loadFirst(string constraint, MYSQL *conn) {\n"
+	      << "  vector<" << *it << "*> foo = load(\"\",1,conn);\n"
+	      << "  return foo[0];\n"
+	      << "}\n\n";
+	cfile << "vector<" << *it << "*> " << *it << "::load(string constraint, int count, MYSQL *conn) {\n"
+	      << "  " << *it << " o;\n"
+	      << "  if ( conn == NULL )\n"
+	      << "    conn = getMySQLConnection();\n"
+	      << "  if ( conn == NULL ) {\n"
+	      << "    cerr << \"Ack!  conn is null in " << *it << "::load()\" << endl;\n"
+	      << "    exit(1);\n"
+	      << "  }\n"
+	      << "  stringstream querystream;\n"
+	      << "  querystream << \"select * from \" << o.getTableName();\n"
+	      << "  if ( constraint != \"\" )\n"
+	      << "    querystream << \" where \" << constraint;\n"
+	      << "  if ( count != 0 )\n"
+	      << "    querystream << \" limit \" << count;\n"
+	      << "  string query = querystream.str();\n"
+	      << "  if (mysql_query(conn, query.c_str())) {\n"
+	      << "    cerr << mysql_error(conn) << endl;\n"
+	      << "    exit(1);\n"
+	      << "  }\n"
+	      << "  MYSQL_RES *res = mysql_use_result(conn);\n"
+	      << "  vector<" << *it << "*> *ret = new vector<" << *it << "*>();\n"
+	      << "  MYSQL_ROW row;\n"
+	      << "  while ((row = mysql_fetch_row(res)) != NULL)\n"
+	      << "    ret->push_back((" << *it << "*)(o.readInFullRow(row)));\n"
+	      << "  mysql_free_result(res);\n"
+	      << "  return *ret;\n"
+	      << "}\n\n";
+	cfile << "void " << *it << "::freeVector(vector<" << *it << "*> vec) {\n"
+	      << "  for ( unsigned int i = 0; i < vec.size(); i++ )\n"
+	      << "    delete vec[i];\n"
+	      << "  vec.clear();\n"
+	      << "}\n\n";
         // getters and setters
         for ( int i = 0; i < fields.size(); i++ ) {
 	    cfile << "\n// " << fields[i] << ": " << types[i] << "\n\n";
