@@ -274,12 +274,12 @@ int main(int argc, char** argv) {
             hfile << "  private:\n    " << convertType(types[i]) << " " << fields[i] << ";\n";
 	    hfile << "    bool _" << fields[i] << "_is_null;\n";
 	    hfile << "  public:\n";
-            hfile << "    " << convertType(types[i]) << "* get_" << fields[i] << "();\n" <<
+            hfile << "   const " << convertType(types[i]) << "* get_" << fields[i] << "() const;\n" <<
                     "    void set_" << fields[i] << " (" << convertType(types[i]) << " x);\n";
             if ( convertType(types[i]) != "char*" )
                 hfile << "    void set_" << fields[i] << " (char* x);\n";
             hfile << "    void " << "setToNull_" << fields[i] << "();\n";
-            hfile << "    bool " << "getIsNull_" << fields[i] << "();\n\n";
+            hfile << "    bool " << "getIsNull_" << fields[i] << "() const;\n\n";
         }
 	// end of h file
         hfile << "};\n\n"; // class close
@@ -396,8 +396,8 @@ int main(int argc, char** argv) {
             if ( convertType(types[i]) == "char*" )
                 extraCheck = "if ( x == NULL ) " + fields[i] + " = (char*)\"NULL\"; else ";
             // getter
-            cfile << convertType(types[i]) << "* " << *it << "::get_" << fields[i]
-                    << "() {\n  if (_" << fields[i] 
+            cfile << "const " << convertType(types[i]) << "* " << *it << "::get_" << fields[i]
+                    << "() const {\n  if (_" << fields[i] 
                     << "_is_null )\n    return NULL;\n  else\n    return &" 
                     << fields[i] << ";\n}\n\n";
             cfile << "void " << *it << "::set_" << fields[i] << " (" 
@@ -407,7 +407,7 @@ int main(int argc, char** argv) {
             cfile << "void " << *it << "::setToNull_" << fields[i] << "() {\n  _"
                     << fields[i] << "_is_null = true;\n}\n\n";
             // get is NULL
-            cfile << "bool " << *it << "::getIsNull_" << fields[i] << "() {\n  return _"
+            cfile << "bool " << *it << "::getIsNull_" << fields[i] << "() const {\n  return _"
                     << fields[i] << "_is_null;\n}\n\n";
             // setting from a char* when the field type is not char*
             if ( convertType(types[i]) != "char*" )
