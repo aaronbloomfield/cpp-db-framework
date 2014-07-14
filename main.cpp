@@ -261,7 +261,7 @@ int main(int argc, char** argv) {
         hfile << ");\n";
 	hfile << "    static vector<" << *it << "*> loadAll(MYSQL *conn = NULL);\n";
 	hfile << "    static vector<" << *it << "*> load(string constraint, int count = 0, MYSQL *conn = NULL);\n";
-	hfile << "    static " << *it << "* loadFirst(string constraint, MYSQL *conn = NULL);\n";
+	hfile << "    static " << *it << "* loadFirst(string constraint = \"\", MYSQL *conn = NULL);\n";
 	hfile << "    static void freeVector(vector<" << *it << "*> vec);\n";
         // protected methods
         hfile << "\n  protected:\n    virtual dbobject* readInFullRow(MYSQL_ROW row);\n"
@@ -353,7 +353,7 @@ int main(int argc, char** argv) {
 	      << "  return load(\"\",0,conn);\n"
 	      << "}\n\n";
 	cfile << "" << *it << "* " << *it << "::loadFirst(string constraint, MYSQL *conn) {\n"
-	      << "  vector<" << *it << "*> foo = load(\"\",1,conn);\n"
+	      << "  vector<" << *it << "*> foo = load(constraint,1,conn);\n"
 	      << "  return foo[0];\n"
 	      << "}\n\n";
 	cfile << "vector<" << *it << "*> " << *it << "::load(string constraint, int count, MYSQL *conn) {\n"
