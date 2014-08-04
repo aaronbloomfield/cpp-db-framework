@@ -39,7 +39,7 @@ These methods all have their impelementation in the dbobject.cpp file.  All thes
 - `void executeUpdate(string query, MYSQL *conn = NULL)`: this executes a MySQL `update` command, which is assumed to not return a value.
 - `virtual void save(MYSQL *conn = NULL)`: this method executes a MySQL `update` command (based on the `id` field) to overwrite the existing entry in the DB.  This is a pure virtual method.
 - `void saveAll(vector<dbobject*> vec, MYSQL *conn = NULL)`: this calls the `save()` method on each of the objects in the vector.
-
+- `unsigned int getLastInsertID(MYSQL *conn = NULL)`: gets the `last_insert_id()` value (i.e., the ID of the last inserted value into the DB).
 
 ##### Protected methods #####
 
@@ -101,3 +101,4 @@ This is a list of features yet to be implemented (i.e., the limitations of this 
 - Enums are just stored as a `string`, and can be set (through the C++ object) to any value, and is not restricted to the enum value
 - Likewise, decimal types are just stored as `string` objects
 - If there is no auto_increment ID field in a table (or at least as the first column in a table), then it should detect this and prevent saving of records
+- strings are not escaped, so if you have single quotes (or backslashes, etc.) in there, the SQL query will fail
