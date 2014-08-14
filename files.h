@@ -30,14 +30,13 @@ public:
   static void saveAll(vector<dbobject*> vec, MYSQL *conn = NULL);
   static void executeUpdate(string query, MYSQL *conn = NULL);
   static unsigned int getLastInsertID(MYSQL *conn = NULL);
+  static MYSQL *getMySQLConnection();
 
   virtual void save(MYSQL *conn = NULL) = 0;
 
 protected:
   static bool _verbose;
   static MYSQL *theconn;
-
-  static MYSQL *getMySQLConnection();
 
   virtual dbobject* readInFullRow(MYSQL_ROW row) = 0;
   virtual string getTableName() = 0;

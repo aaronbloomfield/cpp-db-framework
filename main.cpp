@@ -354,7 +354,10 @@ int main(int argc, char** argv) {
 	      << "}\n\n";
 	cfile << "" << *it << "* " << *it << "::loadFirst(string constraint, MYSQL *conn) {\n"
 	      << "  vector<" << *it << "*> foo = load(constraint,1,conn);\n"
-	      << "  return foo[0];\n"
+	      << "  if ( foo.size() == 0 )\n"
+	      << "    return NULL;\n"
+	      << "  else\n"
+	      << "    return foo[0];\n"
 	      << "}\n\n";
 	cfile << "vector<" << *it << "*> " << *it << "::load(string constraint, int count, MYSQL *conn) {\n"
 	      << "  " << *it << " o;\n"
@@ -371,6 +374,8 @@ int main(int argc, char** argv) {
 	      << "  if ( count != 0 )\n"
 	      << "    querystream << \" limit \" << count;\n"
 	      << "  string query = querystream.str();\n"
+	      << "  if ( _verbose )\n"
+	      << "    cout << query << endl;\n"
 	      << "  if (mysql_query(conn, query.c_str())) {\n"
 	      << "    cerr << mysql_error(conn) << endl;\n"
 	      << "    exit(1);\n"
@@ -500,7 +505,7 @@ int main(int argc, char** argv) {
 
     cout << "Writing Makefile..." << endl;
     ofstream makefile("dbcpp/Makefile");
-    makefile << "CXX = g++ -g -Wall\n\n"
+    makefile << "CXX = g++ -O2 -Wall\n\n"
             << "OFILES = " << ofilelist << "\n\n"
             << "OFILESWITHMAIN = " << ofilelist << " main.o\n\n"
             << ".SUFFIXES: .o .cpp\n\n"
