@@ -16,6 +16,7 @@ The `connect()` methods in dbobject will connect to the database; dbobject.h has
 
 All classes are in a `db` namespace.
 
+Note: the mysql library, which this tool uses, is apparently not as [thread-safe as they claim](http://dev.mysql.com/doc/refman/4.1/en/c-api-threaded-clients.html).  In particular, using OpenMP will require that **each** thread have it's own connection to the DB (obtained via a call to `mysql_init()`, and then configured via a call to `mysql_real_connect()`).  Note that the `dbobject::connect()` method saves the MySQL connection information in a shared (and static) variable, so you can't call that multiple times.
 
 Classes
 -------
@@ -102,3 +103,4 @@ This is a list of features yet to be implemented (i.e., the limitations of this 
 - Likewise, decimal types are just stored as `string` objects
 - If there is no auto_increment ID field in a table (or at least as the first column in a table), then it should detect this and prevent saving of records
 - strings are not escaped, so if you have single quotes (or backslashes, etc.) in there, the SQL query will fail
+- it would be nice if there were methods to open up separate connections for various threads (or have it automatically detect threads in OpenMP, and handle it itself)
