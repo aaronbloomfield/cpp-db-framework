@@ -19,7 +19,6 @@ namespace db {
 class dbobject {
 public:
   dbobject();
-  dbobject(const dbobject& orig);
   virtual ~dbobject();
 
   static bool connect(string host, string db, string user, string passwd);
@@ -34,6 +33,9 @@ public:
 
   virtual void save(MYSQL *conn = NULL) = 0;
 
+  static void enable_reconnects (string host, string name, string user, string pass, int num);
+  static void set_reconnect_callback ( void (*f)(int) );
+
 protected:
   static bool _verbose;
   static MYSQL *theconn;
@@ -43,8 +45,17 @@ protected:
   virtual ostream& put(ostream &out) = 0;
   virtual bool isUpdate() = 0;
 
+  static bool reconnect();
+  static int num_reconnects_allowed();
+  static void possibly_call_reconnect_callback();
+
 private:
+  dbobject(const dbobject& orig);
+
   static bool connect_private(const char* host, const char* db, const char* user, const char* passwd);
+  static int num_reconnects;
+  static string dbhost, dbpass, dbuser, dbname;
+  static void (*func)(int);
 
   friend ostream& operator<< (ostream& out, dbobject &x);
 
@@ -75,6 +86,12 @@ using namespace std;
 
 namespace db {
 
+string dbobject::dbpass = string();
+string dbobject::dbname = string();
+string dbobject::dbuser = string();
+string dbobject::dbhost = string();
+void (*dbobject::func)(int) = NULL;
+int dbobject::num_reconnects = 0;
 bool dbobject::_verbose = false;
 MYSQL* dbobject::theconn = NULL;
 
@@ -85,6 +102,42 @@ dbobject::dbobject(const dbobject& orig) {
 }
 
 dbobject::~dbobject() {
+}
+
+void dbobject::enable_reconnects (string host, string name, string user, string pass, int num) {
+  dbpass = pass;
+  dbhost = host;
+  dbname = name;
+  dbuser = user;
+  num_reconnects = num;
+}
+
+bool dbobject::reconnect() {
+  if ( num_reconnects == 0 ) {
+    cerr << "No more reconnect attempts allowed." << endl;
+    return false;
+  }
+  cerr << "Attempting to reconnect to the DB (" << num_reconnects-- << " more attempts allowed)..." << endl;
+  if ( connect_private(dbhost.c_str(),dbname.c_str(),dbuser.c_str(),dbpass.c_str()) ) {
+    cerr << "Reconnection attempt successful!" << endl;
+    return true;
+  } else {
+    cerr << "Reconnection attempt failed!" << endl;
+    return false;
+  }
+}
+
+int dbobject::num_reconnects_allowed() {
+  return num_reconnects;
+}
+
+void dbobject::set_reconnect_callback ( void (*f)(int) ) {
+  func = f;
+}
+
+void dbobject::possibly_call_reconnect_callback() {
+  if ( func != NULL )
+    (*func)(num_reconnects);
 }
 
 bool dbobject::connect_private(const char* host, const char* db, const char* user, const char* passwd) {
@@ -137,8 +190,19 @@ unsigned int dbobject::getLastInsertID(MYSQL *conn) {
     } else
       cerr << mysql_error(conn) << " in dbobject::getLastInsertID()" << endl;
   }
-  if ( isbad )
-    exit(1);
+  if ( isbad ) {
+    bool recret;
+#pragma omp critical
+    recret = reconnect();
+    if ( recret ) {
+      possibly_call_reconnect_callback();
+      cerr << "Calling method again..." << endl;
+      return getLastInsertID(); // does NOT send in the 'conn' parameter
+    } else {
+      cerr << "Unable to reconnect to database." << endl;
+      exit(1);
+    }
+  }
   return id;
 }
 
@@ -156,8 +220,19 @@ void dbobject::executeUpdate(string query, MYSQL *conn) {
     if ( isbad )
       cerr << mysql_error(conn) << " in dbobject::executeUpdate() on query: " << query << endl;
   }
-  if ( isbad )
-    exit(1);
+  if ( isbad ) {
+    bool recret;
+#pragma omp critical
+    recret = reconnect();
+    if ( recret ) {
+      possibly_call_reconnect_callback();
+      cerr << "Calling method again..." << endl;
+      return executeUpdate(query); // does NOT send in the 'conn' parameter
+    } else {
+      cerr << "Unable to reconnect to database." << endl;
+      exit(1);
+    }
+  }
 }
 
 void dbobject::saveAll(vector<dbobject*> vec, MYSQL *conn) {

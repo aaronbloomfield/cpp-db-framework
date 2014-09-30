@@ -53,6 +53,10 @@ These methods are all `protected` in the sub-classes; there is also two (`operat
 - `virtual ostream& put(ostream &out)`: this allows the sub-class to print itself, and is only called by `operator<< ()`.
 - `virtual bool isUpdate()`: whether the current query to be executed is an update or not.
 
+### Methods to document... ###
+
+- the reconnect family of methods, including the callback
+
 ### sub-classes ###
 
 Each table in the DB has it's own class, and the class name is the same as the table name.  For each column in the table, the following are included in the class:
