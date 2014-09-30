@@ -96,11 +96,17 @@ bool dbobject::connect_private(const char* host, const char* db, const char* use
 }
 
 bool dbobject::connect(char* host, char* db, char* user, char* passwd) {
-  return connect_private(host, db, user, passwd);
+  bool ret;
+#pragma omp critical
+  ret = connect_private(host, db, user, passwd);
+  return ret;
 }
 
 bool dbobject::connect(string host, string db, string user, string passwd) {
-  return connect_private(host.c_str(),db.c_str(),user.c_str(),passwd.c_str());
+  bool ret;
+#pragma omp critical
+  ret = connect_private(host.c_str(),db.c_str(),user.c_str(),passwd.c_str());
+  return ret;
 }
 
 void dbobject::setVerbose(bool which) {
@@ -119,18 +125,22 @@ unsigned int dbobject::getLastInsertID(MYSQL *conn) {
   if ( conn == NULL )
     conn = theconn;
   string query = "select last_insert_id()";
-  if (mysql_query(conn, query.c_str())) {
-    cerr << mysql_error(conn) << endl;
-    exit(1);
+  unsigned int id = 0, isbad;
+#pragma omp critical
+  {
+    isbad = mysql_query(conn, query.c_str());
+    if ( !isbad ) {
+      MYSQL_RES *res = mysql_use_result(conn);
+      MYSQL_ROW row = mysql_fetch_row(res);
+      sscanf (row[0], "%d", &id);
+      mysql_free_result(res);
+    } else
+      cerr << mysql_error(conn) << " in dbobject::getLastInsertID()" << endl;
   }
-  MYSQL_RES *res = mysql_use_result(conn);
-  MYSQL_ROW row = mysql_fetch_row(res);
-  unsigned int id = 0;
-  sscanf (row[0], "%d", &id);
-  mysql_free_result(res);
+  if ( isbad )
+    exit(1);
   return id;
 }
-
 
 void dbobject::executeUpdate(string query, MYSQL *conn) {
   if ( conn == NULL )
@@ -139,10 +149,15 @@ void dbobject::executeUpdate(string query, MYSQL *conn) {
     cerr << "Ack!  conn is null in dbobject::executeUpdate()" << endl;
     exit(1);
   }
-  if (mysql_query(conn, query.c_str())) {
-    cerr << mysql_error(conn) << endl;
-    exit(1);
+  int isbad;
+#pragma omp critical
+  {
+    isbad = mysql_query(conn, query.c_str());
+    if ( isbad )
+      cerr << mysql_error(conn) << " in dbobject::executeUpdate() on query: " << query << endl;
   }
+  if ( isbad )
+    exit(1);
 }
 
 void dbobject::saveAll(vector<dbobject*> vec, MYSQL *conn) {
@@ -153,7 +168,7 @@ void dbobject::saveAll(vector<dbobject*> vec, MYSQL *conn) {
     exit(1);
   }
   for ( unsigned int i = 0; i < vec.size(); i++ )
-    vec[i]->save();
+    vec[i]->save(); // already in its own critical section
 }
 
 ostream& operator<< (ostream& out, dbobject &x) {

@@ -90,6 +90,12 @@ A "all\_db\_h\_files.h" file is created, which just \#include's all the other .h
 A sample Makefile is created, which compiles all of the .cpp files created by this utility.  The 'main' target will create an executable, but a main.cpp file needs to be provided for that.
 
 
+Notes
+-----
+
+All the calls to the mysql library are enclosed in OpenMP `#pragma omp critical` blocks, as the mysql library is *not* thread-safe (even though it claims to be).
+
+
 Todos / Limitations
 -------------------
 

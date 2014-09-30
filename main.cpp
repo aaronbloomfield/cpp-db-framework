@@ -376,16 +376,22 @@ int main(int argc, char** argv) {
 	      << "  string query = querystream.str();\n"
 	      << "  if ( _verbose )\n"
 	      << "    cout << query << endl;\n"
-	      << "  if (mysql_query(conn, query.c_str())) {\n"
-	      << "    cerr << mysql_error(conn) << endl;\n"
-	      << "    exit(1);\n"
-	      << "  }\n"
-	      << "  MYSQL_RES *res = mysql_use_result(conn);\n"
+	      << "  int isbad;\n"
 	      << "  vector<" << *it << "*> ret;\n"
-	      << "  MYSQL_ROW row;\n"
-	      << "  while ((row = mysql_fetch_row(res)))\n"
-	      << "    ret.push_back((" << *it << "*)(o.readInFullRow(row)));\n"
-	      << "  mysql_free_result(res);\n"
+	      << "#pragma omp critical\n"
+	      << "  {\n"
+	      << "    isbad = mysql_query(conn, query.c_str());\n"
+	      << "    if ( !isbad ) {\n"
+	      << "      MYSQL_RES *res = mysql_use_result(conn);\n"
+	      << "      MYSQL_ROW row;\n"
+	      << "      while ((row = mysql_fetch_row(res)))\n"
+	      << "	ret.push_back((" << *it << "*)(o.readInFullRow(row)));\n"
+	      << "      mysql_free_result(res);\n"
+	      << "    } else\n"
+	      << "      cerr << mysql_error(conn) << \" in " << *it << "::load() on query: \" << query << endl;\n"
+	      << "  }\n"
+	      << "  if ( isbad )\n"
+	      << "    exit(1);\n"
 	      << "  return ret;\n"
 	      << "}\n\n";
 	cfile << "void " << *it << "::freeVector(vector<" << *it << "*> vec) {\n"
@@ -480,13 +486,18 @@ int main(int argc, char** argv) {
                 cfile << "\"',\";\n";
         }
         cfile << "  // finishing up the query...\n  if ( isUpdate() )\n"
-                << "    query << \" where " << fields[0] << "=\" << " << fields[0] << ";\n"
-                << "  if ( _verbose )\n    cout << query.str() << endl;\n";
-        cfile << "  if (mysql_query(conn, query.str().c_str())) {\n"
-                << "    cerr << mysql_error(conn) << endl;\n"
-                << "    exit(1);\n"
-                << "  }\n"
-                << "}\n\n";
+	      << "    query << \" where " << fields[0] << "=\" << " << fields[0] << ";\n"
+	      << "  if ( _verbose )\n    cout << query.str() << endl;\n"
+	      << "  int isbad;\n"
+	      << "#pragma omp critical\n"
+	      << "  {\n"
+	      << "    isbad = mysql_query(conn, query.str().c_str());\n"
+	      << "    if ( isbad )\n"
+	      << "      cerr << mysql_error(conn) << \" in " << *it << "::save() on query: \" << query.str() << endl;\n"
+	      << "  }\n"
+	      << "  if ( isbad )\n"
+	      << "    exit(1);\n"
+	      << "}\n\n";
 	cfile << "} // namespace db\n\n";
         // close file
         cfile.close();
@@ -505,7 +516,7 @@ int main(int argc, char** argv) {
 
     cout << "Writing Makefile..." << endl;
     ofstream makefile("dbcpp/Makefile");
-    makefile << "CXX = g++ -O2 -Wall\n\n"
+    makefile << "CXX = g++ -O2 -Wall -fopenmp\n\n"
             << "OFILES = " << ofilelist << "\n\n"
             << "OFILESWITHMAIN = " << ofilelist << " main.o\n\n"
             << ".SUFFIXES: .o .cpp\n\n"
