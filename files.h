@@ -36,6 +36,8 @@ public:
   static void enable_reconnects (string host, string name, string user, string pass, int num);
   static void set_reconnect_callback ( void (*f)(int) );
 
+  static unsigned long get_query_count();
+
 protected:
   static bool _verbose;
   static MYSQL *theconn;
@@ -48,6 +50,7 @@ protected:
   static bool reconnect();
   static int num_reconnects_allowed();
   static void possibly_call_reconnect_callback();
+  static void increment_query_count();
 
 private:
   dbobject(const dbobject& orig);
@@ -56,6 +59,7 @@ private:
   static int num_reconnects;
   static string dbhost, dbpass, dbuser, dbname;
   static void (*func)(int);
+  static unsigned long query_count;
 
   friend ostream& operator<< (ostream& out, dbobject &x);
 
@@ -94,6 +98,7 @@ void (*dbobject::func)(int) = NULL;
 int dbobject::num_reconnects = 0;
 bool dbobject::_verbose = false;
 MYSQL* dbobject::theconn = NULL;
+unsigned long dbobject::query_count = 0;
 
 dbobject::dbobject() {
 }
@@ -140,6 +145,15 @@ void dbobject::possibly_call_reconnect_callback() {
     (*func)(num_reconnects);
 }
 
+unsigned long dbobject::get_query_count() {
+  return query_count;
+}
+
+void dbobject::increment_query_count() {
+  // all calls to this already are in a #pragma critical
+  query_count++;
+}
+
 bool dbobject::connect_private(const char* host, const char* db, const char* user, const char* passwd) {
   MYSQL *conn = mysql_init(NULL);
   if (!mysql_real_connect(conn, host, user, passwd, db, 0, NULL, 0))
@@ -182,6 +196,7 @@ unsigned int dbobject::getLastInsertID(MYSQL *conn) {
 #pragma omp critical
   {
     isbad = mysql_query(conn, query.c_str());
+    increment_query_count();
     if ( !isbad ) {
       MYSQL_RES *res = mysql_use_result(conn);
       MYSQL_ROW row = mysql_fetch_row(res);
@@ -217,6 +232,7 @@ void dbobject::executeUpdate(string query, MYSQL *conn) {
 #pragma omp critical
   {
     isbad = mysql_query(conn, query.c_str());
+    increment_query_count();
     if ( isbad )
       cerr << mysql_error(conn) << " in dbobject::executeUpdate() on query: " << query << endl;
   }
