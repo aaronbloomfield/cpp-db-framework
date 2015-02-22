@@ -23,6 +23,7 @@ public:
 
   static bool connect(string host, string db, string user, string passwd);
   static bool connect(char* host, char* db, char* user, char* passwd);
+  static void disconnect();
 
   static void setVerbose (bool which);
   static void setMySQLConnection(MYSQL *conn);
@@ -174,6 +175,12 @@ bool dbobject::connect(string host, string db, string user, string passwd) {
 #pragma omp critical
   ret = connect_private(host.c_str(),db.c_str(),user.c_str(),passwd.c_str());
   return ret;
+}
+
+void dbobject::disconnect() {
+  if ( theconn != NULL )
+    mysql_close(theconn);
+  theconn = NULL;
 }
 
 void dbobject::setVerbose(bool which) {
