@@ -230,8 +230,10 @@ int main(int argc, char** argv) {
                 << "#include \"dbobject.h\"\n\nusing namespace std;\n\n";
 	hfile << "namespace db {\n\n";
         hfile << "class " << *it << " : public dbobject {\n";
-        hfile << "\n  public:\n    " << *it << "();\n";
-        // setAll() and the associated constructor
+        hfile << "\n  public:\n";
+        // the constructors and setAll()
+	hfile << "    " << *it << "();\n";
+	hfile << "    " << *it << " (" << *it << "& other);\n";
         hfile << "    " << *it << " (";
         for ( int i = 0; i < fields.size(); i++ )
             hfile << "string _" << fields[i] << ((i!=fields.size()-1)?", ":"");
@@ -293,10 +295,16 @@ int main(int argc, char** argv) {
         cfile << "#include \"" << *it << ".h\"\n\n#include <stdio.h>\n"
                 << "#include <string.h>\n#include <stdlib.h>\n#include <sstream>\n\n";
 	cfile << "namespace db {\n\n";
-        // constructor
+        // default constructor
         cfile << *it << "::" << *it << "() {\n";
         for ( int i = 0; i < fields.size(); i++ )
             cfile << "  _" << fields[i] << "_is_null = true;\n";
+        cfile << "}\n\n";
+        // copy constructor
+        cfile << *it << "::" << *it << "(" << *it << "& other) {\n";
+        for ( int i = 0; i < fields.size(); i++ )
+            cfile << "  this->" << fields[i] << " = other." << fields[i] << ";\n"
+		  << "  this->_" << fields[i] << "_is_null = other._" << fields[i] << "_is_null;\n";
         cfile << "}\n\n";
         // the specific constructor with strings
         cfile << *it << "::" << *it << " (";
