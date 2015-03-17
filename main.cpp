@@ -458,7 +458,7 @@ int main(int argc, char** argv) {
             cfile << "  ret->set_" << fields[i] << "(row[" << i << "]);\n";
         cfile << "  return ret;\n}\n\n";
         // put()
-        cfile << "ostream& " << *it << "::put (ostream& out) {\n  ostringstream ret;\n  ret << \""
+        cfile << "ostream& " << *it << "::put (ostream& out) {\n  stringstream ret;\n  ret << \""
                 << *it << "{\";\n";
         for ( int i = 0; i < fields.size(); i++ )
             cfile << "  if ( _" << fields[i] << "_is_null )\n    ret << \"" << fields[i] 
@@ -478,7 +478,7 @@ int main(int argc, char** argv) {
                 << "    cerr << \"Ack!  conn is null in " << *it << "::save()\" << endl;\n"
                 << "    exit(1);\n"
                 << "  }\n"
-                << "  ostringstream query;\n"
+                << "  stringstream query;\n"
                 << "  if ( isUpdate() )\n"
                 << "    query << \"update \" << getTableName() << \" set\";\n"
                 << "  else\n"
