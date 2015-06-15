@@ -31,6 +31,7 @@ public:
   static void executeUpdate(string query, MYSQL *conn = NULL);
   static unsigned int getLastInsertID(MYSQL *conn = NULL);
   static MYSQL *getMySQLConnection();
+  static void raise_error(string s);
 
   virtual void save(MYSQL *conn = NULL) = 0;
 
@@ -84,6 +85,7 @@ const char *dbobject_c = R"DBOBJC(//
 #include <sstream>
 #include <stdlib.h>
 #include <stdio.h>
+#include <assert.h>
 
 #include "dbobject.h"
 
@@ -256,6 +258,12 @@ void dbobject::executeUpdate(string query, MYSQL *conn) {
       exit(1);
     }
   }
+}
+
+void dbobject::raise_error(string s) {
+  cout << s << endl;
+  // change this to something else, if desired
+  assert(0);
 }
 
 void dbobject::saveAll(vector<dbobject*> vec, MYSQL *conn) {

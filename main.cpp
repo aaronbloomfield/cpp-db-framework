@@ -11,6 +11,7 @@
 #include <vector>
 #include <map>
 #include <fstream>
+#include <sstream>
 
 #include <mysql/mysql.h>
 #include <assert.h>
@@ -131,17 +132,18 @@ string convertType (char* type) {
     return convertTypeMain(type);
 }
 
+// this also sets 'ret' to 1 if the parse was successful
 string readInTypeFromCStr (string field, string type) {
     if ( (type == "int") || (type == "unsigned int") )
-        return "sscanf (x, \"%d\", &" + field + ");";
+        return "int ret = sscanf (x, \"%d\", &" + field + ");";
     if ( type == "bool" )
-        return field + " = ( ( !strcmp(x,\"1\") || !strcmp(x,\"true\") ) ) ? 1 : 0;";
+        return field + " = ( ( !strcmp(x,\"1\") || !strcmp(x,\"true\") ) ) ? 1 : 0; int ret = 1;";
     if ( type == "float" )
-        return "sscanf (x, \"%f\", &" + field + ");";
+        return "int ret = sscanf (x, \"%f\", &" + field + ");";
     if ( type == "double" )
-        return "sscanf (x, \"%lf\", &" + field + ");";
+        return "int ret = sscanf (x, \"%lf\", &" + field + ");";
     if ( type == "string" )
-        return field + " = x;";
+        return field + " = x; int ret = 1;";
     return "\n#error ACK";
 }
 
@@ -158,7 +160,9 @@ string getNullValueForType (string type) {
         return "(char*)\"NULL\"";
     if ( type == "string" )
         return "\"NULL\"";
-    return "\n#error ACK";
+    stringstream str;
+    str << "\n#error ACK ('" << type << "')";
+    return str.str();
 }
 
 int main(int argc, char** argv) {
@@ -210,9 +214,14 @@ int main(int argc, char** argv) {
         string query = "describe " + *it;
         res = runQuery(query);
         vector<string> fields, types;
+	vector<bool> canbenull;
         while ((row = mysql_fetch_row(res)) != NULL) {
             fields.push_back(row[0]);
             types.push_back(row[1]);
+	    if ( !strcmp(row[2],"YES") )
+	      canbenull.push_back(true);
+	    else
+	      canbenull.push_back(false);
         }
         mysql_free_result(res);
         
@@ -274,13 +283,18 @@ int main(int argc, char** argv) {
         for ( int i = 0; i < fields.size(); i++ ) {
 	    hfile << "  // " << fields[i] << ": " << types[i] << "\n";
             hfile << "  private:\n    " << convertType(types[i]) << " " << fields[i] << ";\n";
-	    hfile << "    bool _" << fields[i] << "_is_null;\n";
+	    if ( canbenull[i] )
+	      hfile << "    bool _" << fields[i] << "_is_null;\n";
+	    else
+	      hfile << "    // " << fields[i] << " cannot be null, so no " 
+		    << fields[i] << "_is_null field\n";
 	    hfile << "  public:\n";
             hfile << "    const " << convertType(types[i]) << "* get_" << fields[i] << "() const;\n" <<
                     "    void set_" << fields[i] << " (" << convertType(types[i]) << " x);\n";
             if ( convertType(types[i]) != "char*" )
                 hfile << "    void set_" << fields[i] << " (char* x);\n";
-            hfile << "    void " << "setToNull_" << fields[i] << "();\n";
+	    if ( canbenull[i] )
+	      hfile << "    void " << "setToNull_" << fields[i] << "();\n";
             hfile << "    bool " << "getIsNull_" << fields[i] << "() const;\n\n";
         }
 	// end of h file
@@ -297,14 +311,23 @@ int main(int argc, char** argv) {
 	cfile << "namespace db {\n\n";
         // default constructor
         cfile << *it << "::" << *it << "() {\n";
-        for ( int i = 0; i < fields.size(); i++ )
+        for ( int i = 0; i < fields.size(); i++ ) {
+	  if ( canbenull[i] )
             cfile << "  _" << fields[i] << "_is_null = true;\n";
+	  else
+            cfile << "  " << fields[i] << " = " << getNullValueForType(convertType(types[i]))
+		  << "; // can't be null, so must set value\n";
+	}
         cfile << "}\n\n";
         // copy constructor
         cfile << *it << "::" << *it << "(" << *it << "& other) {\n";
-        for ( int i = 0; i < fields.size(); i++ )
-            cfile << "  this->" << fields[i] << " = other." << fields[i] << ";\n"
-		  << "  this->_" << fields[i] << "_is_null = other._" << fields[i] << "_is_null;\n";
+        for ( int i = 0; i < fields.size(); i++ ) {
+	  cfile << "  this->" << fields[i] << " = other." << fields[i] << ";\n";
+	  if ( canbenull[i] )
+	    cfile << "  this->_" << fields[i] << "_is_null = other._" << fields[i] << "_is_null;\n";
+	  else
+	    cfile << "  // " << fields[i] << " cannot be null, so no setting of _is_null field\n";
+	}
         cfile << "}\n\n";
         // the specific constructor with strings
         cfile << *it << "::" << *it << " (";
@@ -336,9 +359,16 @@ int main(int argc, char** argv) {
             cfile << "string _" << fields[i] << ((i!=fields.size()-1)?", ":"");
         cfile << ") {\n";
         for ( int i = 0; i < fields.size(); i++ )
-            cfile << "  if ( _" << fields[i] << " == \"NULL\" )\n    setToNull_" 
-                    << fields[i] << "();\n  else\n    set_"
-                    << fields[i] << " ((char*)_" << fields[i] << ".c_str());\n";
+	  if ( canbenull[i] )
+            cfile << "  if ( _" << fields[i] << " == \"NULL\" )\n"
+		  << "    setToNull_" << fields[i] << "();\n"
+		  << "  else\n"
+		  << "    set_" << fields[i] << " ((char*)_" << fields[i] << ".c_str());\n";
+	  else
+            cfile << "  if ( _" << fields[i] << " == \"NULL\" )\n"
+		  << "    raise_error(\"cannot pass 'NULL' into " << *it << "::setAll() for field '" << fields[i] << "'\");\n"
+		  << "  else\n"
+		  << "    set_" << fields[i] << " ((char*)_" << fields[i] << ".c_str());\n";
         cfile << "}\n\n";
         // enter() with strings
         cfile << "void " << *it << "::enter(";
@@ -428,25 +458,43 @@ int main(int argc, char** argv) {
                 extraCheck = "if ( x == NULL ) " + fields[i] + " = (char*)\"NULL\"; else ";
             // getter
             cfile << "const " << convertType(types[i]) << "* " << *it << "::get_" << fields[i]
-                    << "() const {\n  if (_" << fields[i] 
-                    << "_is_null )\n    return NULL;\n  else\n    return &" 
-                    << fields[i] << ";\n}\n\n";
+		  << "() const {\n";
+	    if ( canbenull[i] )
+	      cfile << "  if (_" << fields[i] << "_is_null )\n    return NULL;\n";
+	    cfile << "  return &" << fields[i] << ";\n}\n\n";
             cfile << "void " << *it << "::set_" << fields[i] << " (" 
                     << convertType(types[i]) << " x) {\n  " << extraCheck << fields[i] 
-                    << " = x;\n  _" << fields[i] << "_is_null = false;\n}\n" << endl;
+		  << " = x;\n";
+	    if ( canbenull[i] )
+	      cfile << "  _" << fields[i] << "_is_null = false;\n";
+	    cfile << "}\n" << endl;
             // set to NULL
-            cfile << "void " << *it << "::setToNull_" << fields[i] << "() {\n  _"
+	    if ( canbenull[i] )
+	      cfile << "void " << *it << "::setToNull_" << fields[i] << "() {\n  _"
                     << fields[i] << "_is_null = true;\n}\n\n";
             // get is NULL
-            cfile << "bool " << *it << "::getIsNull_" << fields[i] << "() const {\n  return _"
+	    if ( canbenull[i] )
+	      cfile << "bool " << *it << "::getIsNull_" << fields[i] << "() const {\n  return _"
                     << fields[i] << "_is_null;\n}\n\n";
+	    else
+	      cfile << "bool " << *it << "::getIsNull_" << fields[i] 
+		    << "() const {\n  return false;\n}\n\n";
             // setting from a char* when the field type is not char*
-            if ( convertType(types[i]) != "char*" )
+            if ( convertType(types[i]) != "char*" ) {
                 cfile << "void " << *it << "::set_" << fields[i] << " (char* x) {\n"
-                        << "  if ( x == NULL )\n    _" << fields[i] 
-                        << "_is_null = true;\n  else {\n    "
-                        << readInTypeFromCStr(fields[i],convertType(types[i])) << "\n    _"
-                        << fields[i] << "_is_null = false;\n  }\n}\n\n";
+		      << "  if ( x == NULL )\n";
+		if ( canbenull[i] )
+		  cfile << "    _" << fields[i] << "_is_null = true;\n";
+		else
+		  cfile << "    raise_error(\"cannot pass NULL to set_" << fields[i] << "()\");\n";
+		cfile << "  else {\n"
+		      << "    " << readInTypeFromCStr(fields[i],convertType(types[i])) << "\n"
+		      << "    if ( ret != 1 )\n"
+		      << "      raise_error(\"parse error in set_" << fields[i] << "()\");\n";
+		if ( canbenull[i] )
+		  cfile << "    _" << fields[i] << "_is_null = false;\n";
+		cfile << "  }\n}\n\n";
+	    }
         }
         // getTableName()
         cfile << "string " << *it << "::getTableName() {\n"
@@ -461,15 +509,26 @@ int main(int argc, char** argv) {
         cfile << "ostream& " << *it << "::put (ostream& out) {\n  stringstream ret;\n  ret << \""
                 << *it << "{\";\n";
         for ( int i = 0; i < fields.size(); i++ )
+	  if ( canbenull[i] )
             cfile << "  if ( _" << fields[i] << "_is_null )\n    ret << \"" << fields[i] 
                     << "=NULL\"" << ((i!=fields.size()-1)?" << \",\";\n":";\n")
                     << "  else\n    ret << \"" << fields[i] << "=\" << " << fields[i]
                     << ((i!=fields.size()-1)?" << \",\";\n":";\n");
+	  else
+	    cfile << "  ret << \"" << fields[i] << "=\" << " << fields[i]
+		  << ((i!=fields.size()-1)?" << \",\";\n":";\n");
         cfile << "  ret << \"}\";\n  return (out << ret.str());\n}\n\n";
         // isUpdate()
-        cfile << "bool " << *it << "::isUpdate() {\n"
+	if ( canbenull[0] )
+	  // TODO: this won't work for string types...
+	  cfile << "bool " << *it << "::isUpdate() {\n"
 	        << "  return (!_" << fields[0] << "_is_null);\n"
                 << "}\n\n";
+	else {
+	  cfile << "bool " << *it << "::isUpdate() {\n"
+	        << "  return (" << fields[0] << " != " << getNullValueForType(convertType(types[0])) << ");\n"
+                << "}\n\n";
+	}
         // save()
         cfile << "void " << *it << "::save(MYSQL *conn) {\n"
                 << "  if ( conn == NULL )\n"
@@ -485,21 +544,24 @@ int main(int argc, char** argv) {
                 << "    query << \"insert into \" << getTableName() << \" set\";\n";
         for ( int i = 1; i < fields.size(); i++ ) { // skipping first (primary key) column
             cfile << "  // " << types[i] << " field '" << fields[i] << "'" << endl;
-            cfile << "  if ( _" << fields[i] << "_is_null )\n    query << \" " << fields[i]
+	    if ( canbenull[i] ) {
+	      cfile << "  if ( _" << fields[i] << "_is_null )\n    query << \" " << fields[i]
                     << "=NULL\" << ";
-            if ( i == fields.size()-1 )
+	      if ( i == fields.size()-1 )
                 cfile << "\"\";\n";
-            else
+	      else
                 cfile << "\",\";\n";
-            if ( types[i] == "datetime" ) {
+	      if ( types[i] == "datetime" ) {
                 cfile << "  else if ( " << fields[i] << " == \"now()\" )\n    query << \" "
-                        << fields[i] << "=now()\"";
+		      << fields[i] << "=now()\"";
                 if ( i != fields.size()-1 )
-                    cfile << " << \",\";\n";
+		  cfile << " << \",\";\n";
                 else
-                    cfile << ";\n";
-            }
-            cfile << "  else\n    query << \" " << fields[i] << "='\" << " << fields[i] << " << ";
+		  cfile << ";\n";
+	      }
+	      cfile << "  else\n  ";
+	    }
+	    cfile << "  query << \" " << fields[i] << "='\" << " << fields[i] << " << ";
             if ( i == fields.size()-1 )
                 cfile << "\"'\";\n";
             else
