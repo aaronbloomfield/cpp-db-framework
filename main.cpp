@@ -220,6 +220,8 @@ int main(int argc, char** argv) {
             types.push_back(row[1]);
 	    if ( !strcmp(row[2],"YES") )
 	      canbenull.push_back(true);
+	    else if ( !strcmp(row[5],"auto_increment") ) // auto_increment fields can be specified as 'NULL' for the next auto_incremented value
+	      canbenull.push_back(true);
 	    else
 	      canbenull.push_back(false);
         }
