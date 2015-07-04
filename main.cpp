@@ -76,6 +76,10 @@ string convertTypeMain(char* type) {
         return "int";
     if ( !strcmp(type,"tinyint(4)") )
         return "int";
+    if ( !strcmp(type,"smallint(5)") )
+        return "int"; // yes, this could be a short....
+    if ( !strcmp(type,"smallint(5) unsigned") )
+        return "unsigned int"; // yes, this could be a short...
     if ( !strcmp(type,"tinyint(3) unsigned") )
         return "unsigned int";
     if ( !strcmp(type,"bigint") )
@@ -117,7 +121,9 @@ string convertTypeMain(char* type) {
     if ( !strncmp(type,"enum(",5) )
       return "string";
 
-    return "NONE";
+    stringstream sstr;
+    sstr << "NONE(" << type << ")";
+    return sstr.str();
 }
 
 string convertType (string type) {
@@ -134,7 +140,8 @@ string convertType (char* type) {
 
 // this also sets 'ret' to 1 if the parse was successful
 string readInTypeFromCStr (string field, string type) {
-    if ( (type == "int") || (type == "unsigned int") )
+  if ( (type == "int") || (type == "unsigned int") ||
+       (type == "short") || (type == "unsigned short") )
         return "int ret = sscanf (x, \"%d\", &" + field + ");";
     if ( type == "bool" )
         return field + " = ( ( !strcmp(x,\"1\") || !strcmp(x,\"true\") ) ) ? 1 : 0; int ret = 1;";
@@ -144,11 +151,14 @@ string readInTypeFromCStr (string field, string type) {
         return "int ret = sscanf (x, \"%lf\", &" + field + ");";
     if ( type == "string" )
         return field + " = x; int ret = 1;";
-    return "\n#error ACK";
+    stringstream sstr;
+    sstr << "\n// unknown type: " << type << "\n#error ACK";
+    return sstr.str();
 }
 
 string getNullValueForType (string type) {
-    if ( (type == "int") || (type == "unsigned int") )
+    if ( (type == "int") || (type == "unsigned int") ||
+	 (type == "short") || (type == "unsigned short") )
         return "0";
     if ( type == "bool" )
         return "false";
@@ -161,7 +171,7 @@ string getNullValueForType (string type) {
     if ( type == "string" )
         return "\"NULL\"";
     stringstream str;
-    str << "\n#error ACK ('" << type << "')";
+    str << "\n#error ACK // ('" << type << "')";
     return str.str();
 }
 
