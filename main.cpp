@@ -309,6 +309,8 @@ int main(int argc, char** argv) {
 	      hfile << "    void " << "setToNull_" << fields[i] << "();\n";
             hfile << "    bool " << "getIsNull_" << fields[i] << "() const;\n\n";
         }
+	// size_in_bytes()
+	hfile << "    unsigned int size_in_bytes();\n\n";
 	// end of h file
         hfile << "};\n\n"; // class close
 	hfile << "} // namespace db\n\n";
@@ -398,6 +400,14 @@ int main(int argc, char** argv) {
         for ( int i = 0; i < fields.size(); i++ )
             cfile << "_" << fields[i] << ((i!=fields.size()-1)?", ":"");
         cfile << ");\n  x.save();\n}\n\n";
+	// size_in_bytes()
+	cfile << "unsigned int " << *it << "::size_in_bytes() {\n"
+	      << "  unsigned int size = sizeof(*this);\n";
+        for ( int i = 0; i < fields.size(); i++ )
+	  if ( convertType(types[i]) == "string" )
+	    cfile << "  size += " << fields[i] << ".length();\n";
+	cfile << "  return size;\n"
+	      << "}\n\n";
 	// loadAll() and loadFirst()
         cfile << "vector<" << *it << "*> " << *it << "::loadAll(MYSQL *conn) {\n"
 	      << "  return load(\"\",0,conn);\n"
@@ -604,8 +614,8 @@ int main(int argc, char** argv) {
 	      << "    }\n"
 	      << "  }\n"
 	      << "}\n\n";
-	cfile << "} // namespace db\n\n";
         // close file
+	cfile << "} // namespace db\n\n";
         cfile.close();
 
     }
