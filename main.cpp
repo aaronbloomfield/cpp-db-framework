@@ -272,7 +272,8 @@ int main(int argc, char** argv) {
             hfile << "char *_" << fields[i] << ((i!=fields.size()-1)?", ":"");
         hfile << ");\n";
 	// save()
-        hfile << "\n    virtual void save(MYSQL *conn = NULL);\n\n";
+        hfile << "\n    virtual void save(MYSQL *conn = NULL);\n"
+	      << "    virtual string getTableName();\n\n";
         // enter()
         hfile << "    static void enter(";
         for ( int i = 0; i < fields.size(); i++ )
@@ -288,7 +289,6 @@ int main(int argc, char** argv) {
 	hfile << "    static void freeVector(vector<" << *it << "*> vec);\n";
         // protected methods
         hfile << "\n  protected:\n    virtual dbobject* readInFullRow(MYSQL_ROW row);\n"
-                << "    virtual string getTableName();\n"
                 << "    virtual ostream& put (ostream& out);\n"
                 << "    virtual bool isUpdate();\n\n";
         // fields, getters and setters

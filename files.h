@@ -34,6 +34,8 @@ public:
   static void raise_error(string s);
 
   virtual void save(MYSQL *conn = NULL) = 0;
+  virtual string getTableName() = 0;
+  virtual unsigned int size_in_bytes() = 0;
 
   static void enable_reconnects (string host, string name, string user, string pass, int num);
   static void set_reconnect_callback ( void (*f)(int) );
@@ -45,7 +47,6 @@ protected:
   static MYSQL *theconn;
 
   virtual dbobject* readInFullRow(MYSQL_ROW row) = 0;
-  virtual string getTableName() = 0;
   virtual ostream& put(ostream &out) = 0;
   virtual bool isUpdate() = 0;
 
