@@ -573,7 +573,7 @@ int main(int argc, char** argv) {
                 cfile << "\"\";\n";
 	      else
                 cfile << "\",\";\n";
-	      if ( types[i] == "datetime" ) {
+	      if ( types[i] == "datetime" ) { // this is repeated, below, in all cases for datetime fields
                 cfile << "  else if ( " << fields[i] << " == \"now()\" )\n    query << \" "
 		      << fields[i] << "=now()\"";
                 if ( i != fields.size()-1 )
@@ -582,6 +582,16 @@ int main(int argc, char** argv) {
 		  cfile << ";\n";
 	      }
 	      cfile << "  else\n  ";
+	    } else {
+	      if ( types[i] == "datetime" ) { // this is repeated, above, in all cases for datetime fields
+                cfile << "  if ( " << fields[i] << " == \"now()\" )\n    query << \" "
+		      << fields[i] << "=now()\"";
+                if ( i != fields.size()-1 )
+		  cfile << " << \",\";\n";
+                else
+		  cfile << ";\n";
+		cfile << "  else\n  ";
+	      }
 	    }
 	    cfile << "  query << \" " << fields[i] << "='\" << " << fields[i] << " << ";
             if ( i == fields.size()-1 )
