@@ -646,10 +646,10 @@ int main(int argc, char** argv) {
             << "OFILES = " << ofilelist << "\n\n"
             << "OFILESWITHMAIN = " << ofilelist << " main.o\n\n"
             << ".SUFFIXES: .o .cpp\n\n"
-            << "ofiles:	$(OFILES)\n\n" 
+            << "ofiles:	$(OFILES)\n\t@/bin/rm -f dblib.a main.o\n\tar rs dblib.a *.o\n\n" 
             << "main:	$(OFILESWITHMAIN)\n"
             << "\t$(CXX) $(OFILESWITHMAIN) -lmysqlclient\n\n"
-            << "clean:\n\t/bin/rm -f *.o *~\n\n"
+            << "clean:\n\t@/bin/rm -f *.o *.a *~\n\n"
             << "wc:\n\twc -l *.cpp *.h" << endl;
     makefile.close();
 
