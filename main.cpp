@@ -286,7 +286,7 @@ int main(int argc, char** argv) {
 	hfile << "    static vector<" << *it << "*> loadAll(MYSQL *conn = NULL);\n";
 	hfile << "    static vector<" << *it << "*> load(string constraint, int count = 0, MYSQL *conn = NULL);\n";
 	hfile << "    static " << *it << "* loadFirst(string constraint = \"\", MYSQL *conn = NULL);\n";
-	hfile << "    static void freeVector(vector<" << *it << "*> vec);\n";
+	hfile << "    static void freeVector(vector<" << *it << "*> &vec);\n";
         // protected methods
         hfile << "\n  protected:\n    virtual dbobject* readInFullRow(MYSQL_ROW row);\n"
                 << "    virtual ostream& put (ostream& out);\n"
@@ -466,9 +466,11 @@ int main(int argc, char** argv) {
 	      << "  }\n"
 	      << "  return ret;\n"
 	      << "}\n\n";
-	cfile << "void " << *it << "::freeVector(vector<" << *it << "*> vec) {\n"
-	      << "  for ( unsigned int i = 0; i < vec.size(); i++ )\n"
+	cfile << "void " << *it << "::freeVector(vector<" << *it << "*> &vec) {\n"
+	      << "  for ( unsigned int i = 0; i < vec.size(); i++ ) {\n"
 	      << "    delete vec[i];\n"
+	      << "    vec[i] = NULL;\n"
+	      << "  }\n"
 	      << "  vec.clear();\n"
 	      << "}\n\n";
         // getters and setters
