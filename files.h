@@ -38,31 +38,37 @@ public:
   virtual unsigned int size_in_bytes() = 0;
 
   static void enable_reconnects (string host, string name, string user, string pass, int num);
+  static void enable_reconnects (int num);
   static void set_reconnect_callback ( void (*f)(int) );
+  static int num_reconnects_remaining();
 
   static unsigned long get_query_count();
 
 protected:
   static bool _verbose;
-  static MYSQL *theconn;
 
   virtual dbobject* readInFullRow(MYSQL_ROW row) = 0;
   virtual ostream& put(ostream &out) = 0;
   virtual bool isUpdate() = 0;
 
   static bool reconnect();
-  static int num_reconnects_allowed();
   static void possibly_call_reconnect_callback();
   static void increment_query_count();
 
 private:
+  static vector<MYSQL*> conns;
+
   dbobject(const dbobject& orig);
 
   static bool connect_private(const char* host, const char* db, const char* user, const char* passwd);
+  static bool connect_private();
   static int num_reconnects;
   static string dbhost, dbpass, dbuser, dbname;
   static void (*func)(int);
   static unsigned long query_count;
+  static void verify_conn_is_open();
+  static void set_db_credentials (string host, string name, string user, string pass);
+  static void set_db_credentials (char *host, char *name, char *user, char *pass);
 
   friend ostream& operator<< (ostream& out, dbobject &x);
 
@@ -87,6 +93,7 @@ const char *dbobject_c = R"DBOBJC(//
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
+#include <omp.h>
 
 #include "dbobject.h"
 
@@ -101,8 +108,9 @@ string dbobject::dbhost = string();
 void (*dbobject::func)(int) = NULL;
 int dbobject::num_reconnects = 0;
 bool dbobject::_verbose = false;
-MYSQL* dbobject::theconn = NULL;
 unsigned long dbobject::query_count = 0;
+vector<MYSQL*> dbobject::conns = vector<MYSQL*>();
+
 
 dbobject::dbobject() {
 }
@@ -113,30 +121,46 @@ dbobject::dbobject(const dbobject& orig) {
 dbobject::~dbobject() {
 }
 
-void dbobject::enable_reconnects (string host, string name, string user, string pass, int num) {
+void dbobject::set_db_credentials (string host, string name, string user, string pass) {
   dbpass = pass;
   dbhost = host;
   dbname = name;
   dbuser = user;
+}
+
+void dbobject::set_db_credentials (char *host, char *name, char *user, char *pass) {
+  set_db_credentials(string(host),string(name),string(user),string(pass));
+}
+
+void dbobject::enable_reconnects (string host, string name, string user, string pass, int num) {
+  set_db_credentials(host,name,user,pass);
+  num_reconnects = num;
+}
+
+void dbobject::enable_reconnects (int num) {
   num_reconnects = num;
 }
 
 bool dbobject::reconnect() {
   if ( num_reconnects == 0 ) {
-    cerr << "No more reconnect attempts allowed." << endl;
+#pragma omp critical(output)
+    cerr << "No more reconnect attempts allowed in thread " << omp_get_thread_num() << endl;
     return false;
   }
-  cerr << "Attempting to reconnect to the DB (" << num_reconnects-- << " more attempts allowed)..." << endl;
-  if ( connect_private(dbhost.c_str(),dbname.c_str(),dbuser.c_str(),dbpass.c_str()) ) {
-    cerr << "Reconnection attempt successful!" << endl;
+#pragma omp critical(output)
+  cerr << "Attempting to reconnect to the DB in thread " << omp_get_thread_num() << " (" << num_reconnects-- << " more attempts allowed)..." << endl;
+  if ( connect_private() ) {
+#pragma omp critical(output)
+    cerr << "Reconnection attempt successful in thread " << omp_get_thread_num() << endl;
     return true;
   } else {
-    cerr << "Reconnection attempt failed!" << endl;
+#pragma omp critical(output)
+    cerr << "Reconnection attempt failed in thread " << omp_get_thread_num() << endl;
     return false;
   }
 }
 
-int dbobject::num_reconnects_allowed() {
+int dbobject::num_reconnects_remaining() {
   return num_reconnects;
 }
 
@@ -149,6 +173,16 @@ void dbobject::possibly_call_reconnect_callback() {
     (*func)(num_reconnects);
 }
 
+void dbobject::verify_conn_is_open() {
+  unsigned int thread_num = omp_get_thread_num();
+#pragma omp critical(dbcppconns)
+  while ( thread_num >= conns.size() )
+    conns.push_back(NULL);
+  if ( conns[thread_num] == NULL )
+    connect_private();
+  assert(conns[thread_num]!=NULL);
+}
+
 unsigned long dbobject::get_query_count() {
   return query_count;
 }
@@ -158,15 +192,27 @@ void dbobject::increment_query_count() {
   query_count++;
 }
 
+bool dbobject::connect_private() {
+  //assert(dbpass!=""); // pasword can be empty
+  assert(dbhost!="");
+  assert(dbuser!="");
+  assert(dbname!="");
+  return connect_private(dbhost.c_str(),dbname.c_str(),dbuser.c_str(),dbpass.c_str());
+}
+
 bool dbobject::connect_private(const char* host, const char* db, const char* user, const char* passwd) {
+  set_db_credentials(host,db,user,passwd);
   MYSQL *conn = mysql_init(NULL);
-  if (!mysql_real_connect(conn, host, user, passwd, db, 0, NULL, 0))
+  if (!mysql_real_connect(conn, dbhost.c_str(), dbuser.c_str(), dbpass.c_str(), dbname.c_str(), 0, NULL, 0)) {
+    cout << "\tconnection error: " << mysql_error(conn) << endl;
     return false;
+  }
   setMySQLConnection(conn);
   return true;
 }
 
 bool dbobject::connect(char* host, char* db, char* user, char* passwd) {
+  set_db_credentials(host,db,user,passwd);
   bool ret;
 #pragma omp critical(dbcpp)
   ret = connect_private(host, db, user, passwd);
@@ -174,6 +220,7 @@ bool dbobject::connect(char* host, char* db, char* user, char* passwd) {
 }
 
 bool dbobject::connect(string host, string db, string user, string passwd) {
+  set_db_credentials(host,db,user,passwd);
   bool ret;
 #pragma omp critical(dbcpp)
   ret = connect_private(host.c_str(),db.c_str(),user.c_str(),passwd.c_str());
@@ -181,9 +228,15 @@ bool dbobject::connect(string host, string db, string user, string passwd) {
 }
 
 void dbobject::disconnect() {
-  if ( theconn != NULL )
-    mysql_close(theconn);
-  theconn = NULL;
+#pragma omp critical(dbcppconns)
+  {
+    for ( unsigned int i = 0; i < conns.size(); i++ ) {
+      if ( conns[i] != NULL )
+        mysql_close(conns[i]);
+      conns[i] = NULL;
+    }
+    conns.clear();
+  }
 }
 
 void dbobject::setVerbose(bool which) {
@@ -191,16 +244,26 @@ void dbobject::setVerbose(bool which) {
 }
 
 void dbobject::setMySQLConnection(MYSQL *conn) {
-  theconn = conn;
+  unsigned int thread_num = omp_get_thread_num();
+#pragma omp critical(dbcppconns)
+  while ( thread_num >= conns.size() )
+    conns.push_back(NULL);
+  conns[thread_num] = conn;
 }
 
 MYSQL* dbobject::getMySQLConnection() {
-  return theconn;
+  verify_conn_is_open();
+  unsigned int thread_num = omp_get_thread_num();
+  if ( thread_num < conns.size() )
+    return conns[thread_num];
+  else
+    return NULL;
 }
 
 unsigned int dbobject::getLastInsertID(MYSQL *conn) {
+  verify_conn_is_open();
   if ( conn == NULL )
-    conn = theconn;
+    conn = getMySQLConnection();
   string query = "select last_insert_id()";
   unsigned int id = 0, isbad;
   string error;
@@ -224,7 +287,7 @@ unsigned int dbobject::getLastInsertID(MYSQL *conn) {
     recret = reconnect();
     if ( recret ) {
       possibly_call_reconnect_callback();
-      cerr << "Calling method again..." << endl;
+      cerr << "Calling method again in thread " << omp_get_thread_num() << "..." << endl;
       return getLastInsertID(); // does NOT send in the 'conn' parameter
     } else {
       cerr << "Unable to reconnect to database." << endl;
@@ -235,30 +298,28 @@ unsigned int dbobject::getLastInsertID(MYSQL *conn) {
 }
 
 void dbobject::executeUpdate(string query, MYSQL *conn) {
+  verify_conn_is_open();
   if ( conn == NULL )
-    conn = theconn;
+    conn = getMySQLConnection();
   if ( conn == NULL ) {
     cerr << "Ack!  conn is null in dbobject::executeUpdate()" << endl;
     exit(1);
   }
-  int isbad;
-  string error;
+  int myret = -1;
 #pragma omp critical(dbcpp)
-  {
-    isbad = mysql_query(conn, query.c_str());
-    increment_query_count();
-    if ( isbad )
-      error = mysql_error(conn);
-  }
-  if ( isbad ) {
+  myret = mysql_query(conn,query.c_str());
+  increment_query_count();
+  bool isgood = (myret == 0);
+  if ( !isgood ) {
+    string error = mysql_error(conn);
 #pragma omp critical(output)
-    cerr << error << " in dbobject::executeUpdate() on query: " << query << endl;
+    cerr << error << " in thread " << omp_get_thread_num() << " in dbobject::executeUpdate() on query: " << query << endl;
     bool recret = false;
 #pragma omp critical(dbcpp)
     recret = reconnect();
     if ( recret ) {
       possibly_call_reconnect_callback();
-      cerr << "Calling method again..." << endl;
+      cerr << "Calling method again in thread " << omp_get_thread_num() << "..." << endl;
       return executeUpdate(query); // does NOT send in the 'conn' parameter
     } else {
       cerr << "Unable to reconnect to database." << endl;
@@ -274,8 +335,9 @@ void dbobject::raise_error(string s) {
 }
 
 void dbobject::saveAll(vector<dbobject*> vec, MYSQL *conn) {
+  verify_conn_is_open();
   if ( conn == NULL )
-    conn = theconn;
+    conn = getMySQLConnection();
   if ( conn == NULL ) {
     cerr << "Ack!  conn is null in dbobject::saveAll()" << endl;
     exit(1);
