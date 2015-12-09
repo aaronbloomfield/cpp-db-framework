@@ -263,6 +263,7 @@ int main(int argc, char** argv) {
         for ( int i = 0; i < fields.size(); i++ )
             hfile << "char *_" << fields[i] << ((i!=fields.size()-1)?", ":"");
         hfile << ");\n\n";
+	//hfile << "    virtual ~" << *it << "();\n\n";
         hfile << "    void setAll (";
         for ( int i = 0; i < fields.size(); i++ )
             hfile << "string _" << fields[i] << ((i!=fields.size()-1)?", ":"");
@@ -359,6 +360,9 @@ int main(int argc, char** argv) {
         for ( int i = 0; i < fields.size(); i++ )
             cfile << "_" << fields[i] << ((i!=fields.size()-1)?", ":"");
         cfile << ");\n}\n\n";
+	// destructor
+        //cfile << *it << "::~" << *it << "() {\n";
+        //cfile << "}\n\n";
         // setAll() with char*
         cfile << "void " << *it << "::setAll (";
         for ( int i = 0; i < fields.size(); i++ )
@@ -437,8 +441,9 @@ int main(int argc, char** argv) {
 	      << "  if ( _verbose )\n"
 	      << "    cout << query << endl;\n"
 	      << "  int isbad;\n"
+	      << "  string error;\n"
 	      << "  vector<" << *it << "*> ret;\n"
-	      << "#pragma omp critical\n"
+	      << "#pragma omp critical(dbcpp)\n"
 	      << "  {\n"
 	      << "    isbad = mysql_query(conn, query.c_str());\n"
 	      << "    increment_query_count();\n"
@@ -449,11 +454,13 @@ int main(int argc, char** argv) {
 	      << "	ret.push_back((" << *it << "*)(o.readInFullRow(row)));\n"
 	      << "      mysql_free_result(res);\n"
 	      << "    } else\n"
-	      << "      cerr << mysql_error(conn) << \" in " << *it << "::load() on query: \" << query << endl;\n"
+	      << "      error = string(mysql_error(conn));\n"
 	      << "  }\n"
 	      << "  if ( isbad ) {\n"
-	      << "    bool recret;\n"
-	      << "#pragma omp critical\n"
+	      << "#pragma omp critical(output)\n"
+	      << "    cerr << error << \" in " << *it << "::load() on query: \" << query << endl;\n"
+	      << "    bool recret = false;\n"
+	      << "#pragma omp critical(dbcpp)\n"
 	      << "    recret = reconnect();\n"
 	      << "    if ( recret ) {\n"
 	      << "      possibly_call_reconnect_callback();\n"
@@ -484,7 +491,7 @@ int main(int argc, char** argv) {
             cfile << "const " << convertType(types[i]) << "* " << *it << "::get_" << fields[i]
 		  << "() const {\n";
 	    if ( canbenull[i] )
-	      cfile << "  if (_" << fields[i] << "_is_null )\n    return NULL;\n";
+	      cfile << "  if ( _" << fields[i] << "_is_null )\n    return NULL;\n";
 	    cfile << "  return &" << fields[i] << ";\n}\n\n";
             cfile << "void " << *it << "::set_" << fields[i] << " (" 
                     << convertType(types[i]) << " x) {\n  " << extraCheck << fields[i] 
@@ -605,16 +612,21 @@ int main(int argc, char** argv) {
 	      << "    query << \" where " << fields[0] << "=\" << " << fields[0] << ";\n"
 	      << "  if ( _verbose )\n    cout << query.str() << endl;\n"
 	      << "  int isbad;\n"
-	      << "#pragma omp critical\n"
+	      << "  string error;\n"
+	      << "#pragma omp critical(dbcpp)\n"
 	      << "  {\n"
 	      << "    isbad = mysql_query(conn, query.str().c_str());\n"
 	      << "    increment_query_count();\n"
-	      << "    if ( isbad )\n"
-	      << "      cerr << mysql_error(conn) << \" in " << *it << "::save() on query: \" << query.str() << endl;\n"
+	      << "    error = string(mysql_error(conn));\n"
+	      << "    increment_query_count();\n"
+	      << "  }\n"
+	      << "    if ( isbad ) {\n"
+	      << "#pragma omp critical(output)\n"
+	      << "      cerr << error << \" in " << *it << "::save() on query: \" << query.str() << endl;\n"
 	      << "  }\n"
 	      << "  if ( isbad ) {\n"
-	      << "    bool recret;\n"
-	      << "#pragma omp critical\n"
+	      << "    bool recret = false;\n"
+	      << "#pragma omp critical(dbcpp)\n"
 	      << "    recret = reconnect();\n"
 	      << "    if ( recret ) {\n"
 	      << "      possibly_call_reconnect_callback();\n"

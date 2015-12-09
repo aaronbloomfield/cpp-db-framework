@@ -168,14 +168,14 @@ bool dbobject::connect_private(const char* host, const char* db, const char* use
 
 bool dbobject::connect(char* host, char* db, char* user, char* passwd) {
   bool ret;
-#pragma omp critical
+#pragma omp critical(dbcpp)
   ret = connect_private(host, db, user, passwd);
   return ret;
 }
 
 bool dbobject::connect(string host, string db, string user, string passwd) {
   bool ret;
-#pragma omp critical
+#pragma omp critical(dbcpp)
   ret = connect_private(host.c_str(),db.c_str(),user.c_str(),passwd.c_str());
   return ret;
 }
@@ -203,7 +203,8 @@ unsigned int dbobject::getLastInsertID(MYSQL *conn) {
     conn = theconn;
   string query = "select last_insert_id()";
   unsigned int id = 0, isbad;
-#pragma omp critical
+  string error;
+#pragma omp critical(dbcpp)
   {
     isbad = mysql_query(conn, query.c_str());
     increment_query_count();
@@ -213,11 +214,13 @@ unsigned int dbobject::getLastInsertID(MYSQL *conn) {
       sscanf (row[0], "%d", &id);
       mysql_free_result(res);
     } else
-      cerr << mysql_error(conn) << " in dbobject::getLastInsertID()" << endl;
+      error = string(mysql_error(conn));
   }
   if ( isbad ) {
-    bool recret;
-#pragma omp critical
+#pragma omp critical(output)
+    cerr << error << " in dbobject::getLastInsertID()" << endl;
+    bool recret = false;
+#pragma omp critical(dbcpp)
     recret = reconnect();
     if ( recret ) {
       possibly_call_reconnect_callback();
@@ -239,16 +242,19 @@ void dbobject::executeUpdate(string query, MYSQL *conn) {
     exit(1);
   }
   int isbad;
-#pragma omp critical
+  string error;
+#pragma omp critical(dbcpp)
   {
     isbad = mysql_query(conn, query.c_str());
     increment_query_count();
     if ( isbad )
-      cerr << mysql_error(conn) << " in dbobject::executeUpdate() on query: " << query << endl;
+      error = mysql_error(conn);
   }
   if ( isbad ) {
-    bool recret;
-#pragma omp critical
+#pragma omp critical(output)
+    cerr << error << " in dbobject::executeUpdate() on query: " << query << endl;
+    bool recret = false;
+#pragma omp critical(dbcpp)
     recret = reconnect();
     if ( recret ) {
       possibly_call_reconnect_callback();
