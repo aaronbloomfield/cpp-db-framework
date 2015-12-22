@@ -252,6 +252,8 @@ void dbobject::setMySQLConnection(MYSQL *conn) {
 }
 
 MYSQL* dbobject::getMySQLConnection() {
+  if ( conns.size() == 0 )
+    return NULL;
   verify_conn_is_open();
   unsigned int thread_num = omp_get_thread_num();
   if ( thread_num < conns.size() )
