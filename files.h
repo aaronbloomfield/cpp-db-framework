@@ -108,10 +108,10 @@ const char *dbobject_c = R"DBOBJC(//
 #include <sstream>
 #include <stdlib.h>
 #include <stdio.h>
-#include <assert.h>
 #include <omp.h>
 #include <cstdlib>
 
+#include "myassert.h"
 #include "dbobject.h"
 
 using namespace std;
@@ -202,11 +202,11 @@ void dbobject::verify_conn_is_open() {
     }
     if ( conns[thread_num] == NULL )
       connect_mysql_private();
-    assert(conns[thread_num]!=NULL);
+    myassert(conns[thread_num]!=NULL);
   } else if ( connection_status == DBOBJECT_CONNECTION_SQLITE ) {
-    assert(db != NULL);
+    myassert(db != NULL);
   } else {
-    assert(0);
+    myassert(0);
   }
 }
 
@@ -220,15 +220,15 @@ void dbobject::increment_query_count() {
 }
 
 bool dbobject::connect_mysql_private() {
-  //assert(dbpass!=""); // pasword can be empty
-  assert(dbhost!="");
-  assert(dbuser!="");
-  assert(dbname!="");
+  //myassert(dbpass!=""); // pasword can be empty
+  myassert(dbhost!="");
+  myassert(dbuser!="");
+  myassert(dbname!="");
   return connect_mysql_private(dbhost.c_str(),dbname.c_str(),dbuser.c_str(),dbpass.c_str());
 }
 
 bool dbobject::connect_mysql_private(const char* host, const char* db, const char* user, const char* passwd) {
-  assert((connection_status == DBOBJECT_CONNECTION_NONE) || (connection_status == DBOBJECT_CONNECTION_MYSQL));
+  myassert((connection_status == DBOBJECT_CONNECTION_NONE) || (connection_status == DBOBJECT_CONNECTION_MYSQL));
   unsigned int thread_num = omp_get_thread_num();
   if ( (connection_status == DBOBJECT_CONNECTION_MYSQL) &&
        (conns.size() > thread_num) &&
@@ -269,8 +269,8 @@ bool dbobject::connect_sqlite3(string filename) {
 bool dbobject::connect_sqlite3_private(string filename) {
   if ( connection_status == DBOBJECT_CONNECTION_SQLITE )
     return true;
-  assert( connection_status == DBOBJECT_CONNECTION_NONE );
-  assert(db == NULL);
+  myassert( connection_status == DBOBJECT_CONNECTION_NONE );
+  myassert(db == NULL);
   int rc = sqlite3_open(filename.c_str(), &db);
   if ( rc ) {
     cerr << "Can't open sqlite3 database '" << filename << "': " << sqlite3_errmsg(db) << endl;
@@ -284,7 +284,7 @@ void dbobject::disconnect() {
 #pragma omp critical(dbcppconns)
   {
     if ( connection_status == DBOBJECT_CONNECTION_SQLITE ) {
-      assert(db != NULL);
+      myassert(db != NULL);
       sqlite3_close(db);
       db = NULL;
     } else if ( connection_status == DBOBJECT_CONNECTION_MYSQL ) {
@@ -296,7 +296,7 @@ void dbobject::disconnect() {
     } else if ( connection_status == DBOBJECT_CONNECTION_NONE ) {
       // do nothing
     } else {
-      assert(0);
+      myassert(0);
     }
     conns.clear();
     connection_status = DBOBJECT_CONNECTION_NONE;
@@ -308,7 +308,7 @@ void dbobject::setVerbose(bool which) {
 }
 
 void dbobject::setMySQLConnection(MYSQL *conn) {
-  assert((connection_status == DBOBJECT_CONNECTION_NONE) || (connection_status == DBOBJECT_CONNECTION_MYSQL));
+  myassert((connection_status == DBOBJECT_CONNECTION_NONE) || (connection_status == DBOBJECT_CONNECTION_MYSQL));
   unsigned int thread_num = omp_get_thread_num();
   if ( thread_num >= conns.size() ) {
 #pragma omp critical(dbcppconns)
@@ -320,7 +320,7 @@ void dbobject::setMySQLConnection(MYSQL *conn) {
 }
 
 MYSQL* dbobject::getMySQLConnection() {
-  assert(connection_status == DBOBJECT_CONNECTION_MYSQL);
+  myassert(connection_status == DBOBJECT_CONNECTION_MYSQL);
   unsigned int thread_num = omp_get_thread_num();
   if ( thread_num >= conns.size() ) {
 #pragma omp critical(dbcppconns)
@@ -337,21 +337,21 @@ unsigned int dbobject::getLastInsertID() {
   else if ( connection_status == DBOBJECT_CONNECTION_SQLITE )
     return getLastInsertID_sqlite3();
   else {
-    assert(0);
+    myassert(0);
     return 0;
   }
 }
 
 int dbobject::last_insert_rowid_callback(void *last_id, int argc, char **argv, char **azColName){
-  assert(argc == 1);
-  assert(last_id != NULL);
+  myassert(argc == 1);
+  myassert(last_id != NULL);
   int *id = (int*) last_id;
   *id = atoi(argv[0]);
   return 0;
 }
 
 unsigned int dbobject::getLastInsertID_sqlite3() {
-  assert(connection_status == DBOBJECT_CONNECTION_SQLITE);
+  myassert(connection_status == DBOBJECT_CONNECTION_SQLITE);
   char* errorMsg;
   unsigned int last_id = 0;
   int rc = 0;
@@ -366,7 +366,7 @@ unsigned int dbobject::getLastInsertID_sqlite3() {
 
 unsigned int dbobject::getLastInsertID_mysql(MYSQL *conn) {
   unsigned int thread_num = omp_get_thread_num();
-  assert(connection_status == DBOBJECT_CONNECTION_MYSQL);
+  myassert(connection_status == DBOBJECT_CONNECTION_MYSQL);
   verify_conn_is_open();
   if ( conn == NULL )
     conn = getMySQLConnection();
@@ -409,11 +409,11 @@ void dbobject::executeUpdate(string query) {
   else if ( connection_status == DBOBJECT_CONNECTION_SQLITE )
     executeUpdate_sqlite3(query);
   else
-    assert(0);
+    myassert(0);
 }
 
 void dbobject::executeUpdate_sqlite3(string query) {
-  assert(connection_status == DBOBJECT_CONNECTION_SQLITE);
+  myassert(connection_status == DBOBJECT_CONNECTION_SQLITE);
   char* errorMsg;
   int rc = 0;
 #pragma omp critical(dbcpp)
@@ -426,7 +426,7 @@ void dbobject::executeUpdate_sqlite3(string query) {
 
 void dbobject::executeUpdate_mysql(string query, MYSQL *conn) {
   unsigned int thread_num = omp_get_thread_num();
-  assert(connection_status == DBOBJECT_CONNECTION_MYSQL);
+  myassert(connection_status == DBOBJECT_CONNECTION_MYSQL);
   verify_conn_is_open();
   if ( conn == NULL )
     conn = getMySQLConnection();
@@ -460,7 +460,7 @@ void dbobject::executeUpdate_mysql(string query, MYSQL *conn) {
 void dbobject::raise_error(string s) {
   cout << s << endl;
   // change this to something else, if desired
-  assert(0);
+  myassert(0);
 }
 
 void dbobject::saveAll(vector<dbobject*> vec, MYSQL *conn) {
